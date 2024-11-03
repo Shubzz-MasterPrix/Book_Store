@@ -1,4 +1,5 @@
 import mysql.connector
+import getpass
 
 employee_count = 0
 login_success = False
@@ -53,7 +54,7 @@ create_table("sale_record", {
     "phone_number": "INT",
     "book_title": "VARCHAR(80)",
     "quantity": "INT",
-    "price": "FLOAT"
+    "revenue": "FLOAT"
 })
 
 create_table("staff_details", {
@@ -63,9 +64,13 @@ create_table("staff_details", {
     "phone_number": "INT"
 })
 
+temporary_connector = mysql.connector.connect(
+    host='localhost', user='root', password='alpinePROJ_378', database='book_store')
+temp_cursor = temporary_connector.cursor()
+
 temp_cursor.execute('SELECT * FROM login')
 result = temp_cursor.fetchall()
-if result == None:
+if not result:
     temp_cursor.execute(
         "INSERT INTO login VALUES ('{}','{}')".format('book', 'store'))
     temporary_connector.commit()
@@ -75,12 +80,18 @@ end_connection(temp_cursor, temporary_connector)
 
 def want_to_continue():
     global continue_process
-    choice = input("\nDo you want to continue (y/n): ")
 
-    if choice.lower() == 'y':
-        continue_process = True
-    elif choice.lower() == 'n':
-        continue_process = False
+    while True:
+        choice = input("\n    Do you want to continue (y/n): ")
+
+        if choice.lower() == 'y':
+            continue_process = True
+            break
+        elif choice.lower() == 'n':
+            continue_process = False
+            break
+        else:
+            print("\n    Invalid choice, try again.")
 
 # Admin Functions
 
@@ -91,11 +102,32 @@ def add_book():
 
     id = input("\n    Book's ISBN: ")
     title = input("    Title: ")
-    genre = input("    Genre: ")
+    genre = input('''    List of genres:
+    -> Fiction
+    -> Non-Fiction
+    -> Mystery & Thriller
+    -> Fantasy
+    -> Science Fiction
+    -> Romance
+    -> Historical Fiction
+    -> Biography & Memoir
+    -> Self-Help
+    -> Graphic Novels & Comics
+    -> Poetry
+    -> Children's
+    -> Classic Literature
+    -> Science & Technology
+    -> Health & Wellness
+    -> Cookbooks
+    -> Art & Photography
+    -> Spirituality & Religion
+    -> Crime     
+    
+    Genre: ''')
     quantity = int(input("    Quantity: "))
     author = input("    Author: ")
     publication = input("    Publication: ")
-    price = float(input("    Price: "))
+    price = float(input("    Price: ₹"))
 
     query = """
         INSERT INTO available_books (book_id, book_title, genre, quantity, author, publication, price)
@@ -114,14 +146,14 @@ def add_staff():
     connector = get_connection()
     cursor = connector.cursor()
 
-    staff_name = int(input("\n    Name: "))
+    staff_name = input("\n    Name: ")
     staff_id = employee_count + 1
     employee_count += 1
-    gender = input("    Gender: ")
+    gender = input("    Gender (M/F): ")
     phone_number = int(input("    Phone Number: "))
 
-    query = "INSERT INTO staff_details VALUES ('{}','{}','{}','{}')".format(
-        staff_name, staff_id, gender, phone_number)
+    query = "INSERT INTO staff_details VALUES ({},'{}','{}',{})".format(
+        staff_id, staff_name, gender, phone_number)
 
     cursor.execute(query)
     connector.commit()
@@ -135,10 +167,11 @@ def remove_staff():
 
     display_staff()
 
-    id = int(input("\n    Enter Staff ID to remove: "))
+    if employee_count != 0:
+        id = int(input("\n    Enter Staff ID number to remove: "))
 
     cursor.execute(
-        "DELETE FROM staff_details WHERE staff_id = ('{}')".format(id))
+        "DELETE FROM staff_details WHERE staff_id = ({})".format(id))
 
     connector.commit()
     print("\n    Staff removed.")
@@ -154,8 +187,11 @@ def display_staff():
     cursor.execute("SELECT * FROM staff_details")
     data = cursor.fetchall()
 
-    for item in data:
-        output = f'''
+    if not data:
+        print("    No staff currently.")
+    else:
+        for item in data:
+            output = f'''
 **********************************
     Employee ID: {item[0]}
     Name: {item[1]}
@@ -163,7 +199,7 @@ def display_staff():
     Phone Number: {item[3]}
 **********************************'''
 
-        print(output)
+            print(output)
 
     end_connection(cursor, connector)
 
@@ -175,14 +211,18 @@ def display_sale_record():
     cursor.execute("SELECT * FROM sale_record")
     data = cursor.fetchall()
 
-    for sale in data:
-        print(f'''\n
-        Buyer's Name: {sale[0]}
-        Phone Number: {sale[1]}
-        Book Title: {sale[2]}
-        Quantity: {sale[1]}
-        Price of 1 book: {sale[1]}
-        ''')
+    if not data:
+        print("\n    No sales so far.")
+
+    else:
+        for sale in data:
+            print(f'''\n
+    Buyer's Name: {sale[0]}
+    Phone Number: {sale[1]}
+    Book Title: {sale[2]}
+    Quantity: {sale[3]}
+    Price: ₹{sale[4]}
+    ''')
 
     end_connection(cursor, connector)
 
@@ -193,7 +233,11 @@ def total_income():
 
     cursor.execute("SELECT sum(price) FROM sale_record")
     data = cursor.fetchone()
-    print(f"\n    Total Revenue: {data[0]}")
+
+    if data[0] != None:
+        print(f"\n    Total Revenue: ₹{round(data[0], 2)}")
+    else:
+        print("\n    Total Revenue: ₹0")
     end_connection(cursor, connector)
 
 
@@ -203,39 +247,22 @@ def display_stock():
 
     cursor.execute("SELECT * FROM available_books ORDER BY book_title")
     data = cursor.fetchall()
-    for item in data:
-        output = f'''\n*******************************************************************
+
+    if not data:
+        print("No stock available.")
+    else:
+        for item in data:
+            output = f'''\n*******************************************************************
     Book ID: {item[0]}
     Book Title: {item[1]}
     Genre: {item[2]}
     Quantity: {item[3]}
     Author: {item[4]}
     Publication: {item[5]}
-    Price: {item[6]}
+    Price: ₹{item[6]}
 *******************************************************************'''
 
-        print(output)
-
-    end_connection(cursor, connector)
-
-
-def check_book_stock(book_name):
-    connector = get_connection()
-    cursor = connector.cursor()
-
-    cursor.execute(
-        "SELECT book_title FROM available_books WHERE book_name = {}".format(book_name))
-    book = cursor.fetchone()
-    exists = False
-    available_quantity = 0
-    price = 0
-
-    if book[1] is not None:
-        exists = True
-        available_quantity = book[3]
-        price = book[6]
-
-    return exists, available_quantity, price
+            print(output)
 
     end_connection(cursor, connector)
 
@@ -244,124 +271,157 @@ def search_books():
     connector = get_connection()
     cursor = connector.cursor()
 
-    filtration = input('''
+    while True:
+        filtration = input('''
 ................................
     
     Options to search using:
-    1. Name
+    1. Title
     2. Genre
     3. Author
     4. Publication
                             
-    Enter option: ''')
+    Enter option (1/2/3/4): ''')
 
-    if filtration.lower() == 'name':
-        name_filter = input("Enter name to filter: ")
-        cursor.execute("SELECT book_title FROM available_books")
+        cursor.execute("SELECT * FROM available_books")
         results = cursor.fetchall()
+        found = False
 
-        for item in results:
-            if name_filter.lower() in (item[1]).lower():
-                output = f'''\n*******************************************************************
+        if filtration == '1':
+            name_filter = input("    Enter name to filter: ")
+
+            for item in results:
+                if name_filter.lower() in (item[1]).lower():
+                    found = True
+                    print(f'''\n*******************************************************************
     Book ID: {item[0]}
     Book Title: {item[1]}
     Genre: {item[2]}
     Quantity: {item[3]}
     Author: {item[4]}
     Publication: {item[5]}
-    Price: {item[6]}
-*******************************************************************'''
+    Price: ₹{item[6]}
+*******************************************************************''')
+            if found == False:
+                print("Sorry, no such books were found.")
+            break
 
-                print(output)
+        elif filtration == '2':
+            genre_filter = input('''    
+    List of genres:
+    -> Fiction
+    -> Non-Fiction
+    -> Mystery & Thriller
+    -> Fantasy
+    -> Science Fiction
+    -> Romance
+    -> Historical Fiction
+    -> Biography & Memoir
+    -> Self-Help
+    -> Graphic Novels & Comics
+    -> Poetry
+    -> Children's
+    -> Classic Literature
+    -> Science & Technology
+    -> Health & Wellness
+    -> Cookbooks
+    -> Art & Photography
+    -> Spirituality & Religion
+    -> Crime     
+    
+    Enter genre to filter: ''')
 
-    elif filtration.lower() == 'genre':
-        genre_filter = input("Enter genre to filter: ")
-        cursor.execute("SELECT genre FROM available_books")
-        results = cursor.fetchall()
-
-        for item in results:
-            if genre_filter.lower() in (item[2]).lower():
-                output = f'''\n*******************************************************************
+            for item in results:
+                if genre_filter.lower().strip() in (item[2]).lower().strip():
+                    found = True
+                    print(f'''\n*******************************************************************
     Book ID: {item[0]}
     Book Title: {item[1]}
     Genre: {item[2]}
     Quantity: {item[3]}
     Author: {item[4]}
     Publication: {item[5]}
-    Price: {item[6]}
-*******************************************************************'''
+    Price: ₹{item[6]}
+*******************************************************************''')
 
-                print(output)
+            if found == False:
+                print("Sorry, no such books were found.")
+            break
 
-    elif filtration.lower() == 'author':
-        author_filter = input("Enter author to filter: ")
-        cursor.execute("SELECT author FROM available_books")
-        results = cursor.fetchall()
+        elif filtration == '3':
+            author_filter = input("    Enter author to filter: ")
 
-        for item in results:
-            if author_filter.lower() in (item[4]).lower():
-                output = f'''\n*******************************************************************
+            for item in results:
+                if author_filter.lower() in (item[4]).lower():
+                    found = True
+                    print(f'''\n*******************************************************************
     Book ID: {item[0]}
     Book Title: {item[1]}
     Genre: {item[2]}
     Quantity: {item[3]}
     Author: {item[4]}
     Publication: {item[5]}
-    Price: {item[6]}
-*******************************************************************'''
+    Price: ₹{item[6]}
+*******************************************************************''')
+            if found == False:
+                print("Sorry, no such books were found.")
+            break
 
-                print(output)
+        elif filtration == '4':
+            publication_filter = input("    Enter publication to filter: ")
 
-    elif filtration.lower() == 'publication':
-        publication_filter = input("Enter publication to filter: ")
-        cursor.execute("SELECT publication FROM available_books")
-        results = cursor.fetchall()
-
-        for item in results:
-            if publication_filter.lower() in (item[5]).lower():
-                output = f'''\n*******************************************************************
+            for item in results:
+                if publication_filter.lower() in (item[5]).lower():
+                    found = True
+                    print(f'''\n*******************************************************************
     Book ID: {item[0]}
     Book Title: {item[1]}
     Genre: {item[2]}
     Quantity: {item[3]}
     Author: {item[4]}
     Publication: {item[5]}
-    Price: {item[6]}
-*******************************************************************'''
+    Price: ₹{item[6]}
+*******************************************************************''')
+            if found == False:
+                print("Sorry, no such books were found.")
+            break
 
-                print(output)
-
+        else:
+            print("\n    Invalid option, try again.")
     end_connection(cursor, connector)
 
 # Customer specific Functions
 
 
 def purchase():
-    print("\nAvailable Books:")
-    display_stock()
-
     customer_name = input("    Enter your name: ")
     phone_number = int(input("    Enter phone number: "))
-    book = input("    Enter the book to purchase: ")
-    quantity = int("    Enter the quantity to purchase: ")
+    book = input("    Enter the title of the book to purchase: ")
+    quantity = int(input("    Enter the quantity to purchase: "))
 
     connector = get_connection()
     cursor = connector.cursor()
 
-    stock_tuple = check_book_stock(book)
+    cursor.execute(
+        "SELECT * FROM available_books WHERE book_title = %s", (book,))
+    result = cursor.fetchone()
 
-    if stock_tuple[0] == True:
-        if stock_tuple[1] < quantity:
-            print(f"Sorry, only {stock_tuple[1]} books are available.")
+    if result != None:
+        available_quantity = result[3]
+
+        if quantity < 1:
+            print("Sorry, please enter a value greater than 0.")
+        elif available_quantity < quantity:
+            print(f"Sorry, only {available_quantity} pieces of the book are available.")  # noqa
         else:
-            cursor.execute("INSERT INTO sale_record VALUES ('{}','{}','{}','{}','{}')".format(
-                customer_name, phone_number, book, quantity, stock_tuple[2]))
+            cursor.execute("INSERT INTO sale_record (customer_name, phone_number, book_title, quantity, price) VALUES (%s,%s,%s,%s,%s)",
+                           (customer_name, phone_number, book, quantity, (result[6]*quantity)))
 
             cursor.execute(
-                "UPDATE available_books SET quantity = {} WHERE book_name = {}".format((stock_tuple[1]-quantity), book))
+                "UPDATE available_books SET quantity = %s WHERE book_title = %s", ((available_quantity-quantity), book))
 
             connector.commit()
-            print("Transaction completed. Thank you.")
+            print("\n    Transaction completed. Thank you.")
     else:
         print(f"Sorry, {book} is not available in our book store.")
 
@@ -376,30 +436,32 @@ option = input("""
     Options:
     1. Enter as ADMIN
     2. Enter as Customer
+    3. Exit
     
     Enter an option: """)
 
-if option == '1':
-    print("\n~~~~~~~~~LOGIN PAGE~~~~~~~~~")
-    username = input("\n    Username: ")
-    password = input("    Password: ")
+while continue_process:
+    if option == '1':
+        print("\n~~~~~~~~~LOGIN PAGE~~~~~~~~~")
+        username = input("\n    Username: ")
+        password = getpass.getpass("    Password (hidden while typing): ")
 
-    connector = get_connection()
-    cursor = connector.cursor()
+        connector = get_connection()
+        cursor = connector.cursor()
 
-    cursor.execute(
-        "SELECT * FROM login WHERE username = '{}'".format(username.strip()))
-    data = cursor.fetchone()
+        cursor.execute(
+            "SELECT * FROM login WHERE username = '{}'".format(username.strip()))
+        data = cursor.fetchone()
 
-    if data != None and data[1] == password.strip():
-        login_success = True
-    else:
-        print("\n    Sorry, login failed. Incorrect credentials.")
+        if data != None and data[1] == password.strip():
+            login_success = True
+        else:
+            print("\n    Sorry, login failed. Incorrect credentials.")
 
-    end_connection(cursor, connector)
+        end_connection(cursor, connector)
 
-    while continue_process and login_success:
-        admin_choice = input('''
+        while continue_process and login_success:
+            admin_choice = input('''
 ...............................
     
     Options:
@@ -409,67 +471,88 @@ if option == '1':
     4. Display Total Income
     5. See Available Books
     6. Search Books
+    7. Exit
                     
     Enter option: ''')
 
-        if admin_choice == '1':
-            add_book()
-            want_to_continue()
-        elif admin_choice == '2':
-            manage_staff_choice = input("""
+            if admin_choice == '1':
+                add_book()
+                want_to_continue()
+            elif admin_choice == '2':
+                while True:
+
+                    manage_staff_choice = input("""
 .............................
     
     Options:
     1. View Staff Details
     2. Hire Staff
     3. Fire Staff
+    4. Exit this menu
                             
     Enter option: """)
 
-            if manage_staff_choice == '1':
-                display_staff()
+                    if manage_staff_choice == '1':
+                        display_staff()
+                        want_to_continue()
+                        break
+                    elif manage_staff_choice == '2':
+                        add_staff()
+                        want_to_continue()
+                        break
+                    elif manage_staff_choice == '3':
+                        display_staff()
+                        remove_staff()
+                        want_to_continue()
+                        break
+                    elif manage_staff_choice == '4':
+                        break
+                    else:
+                        print("\n    Invalid option, try again.")
+            elif admin_choice == '3':
+                display_sale_record()
                 want_to_continue()
-            elif manage_staff_choice == '2':
-                add_staff()
+            elif admin_choice == '4':
+                total_income()
                 want_to_continue()
-            elif manage_staff_choice == '3':
-                display_staff()
-                remove_staff()
+            elif admin_choice == '5':
+                display_stock()
                 want_to_continue()
-        elif admin_choice == '3':
-            display_sale_record()
-            want_to_continue()
-        elif admin_choice == '4':
-            total_income()
-            want_to_continue()
-        elif admin_choice == '5':
-            display_stock()
-            want_to_continue()
-        elif admin_choice == '6':
-            search_books()
-            want_to_continue()
-        else:
-            break
-elif option == '2':
-    while continue_process:
-        buyer_choice = input('''
+            elif admin_choice == '6':
+                search_books()
+                want_to_continue()
+            elif admin_choice == '7':
+                continue_process = False
+            else:
+                print("\n    Invalid option, try again.")
+    elif option == '2':
+        while continue_process:
+            buyer_choice = input('''
 ...............................
     
     Options:
     1. See all available books
     2. Search books
     3. Purchase Books
+    4. Exit
                     
     Enter option: ''')
 
-        if buyer_choice == '1':
-            display_stock()
-            want_to_continue()
-        elif buyer_choice == '2':
-            search_books()
-            want_to_continue()
-        elif buyer_choice == '3':
-            purchase()
-            want_to_continue()
-        else:
-            break
+            if buyer_choice == '1':
+                display_stock()
+                want_to_continue()
+            elif buyer_choice == '2':
+                search_books()
+                want_to_continue()
+            elif buyer_choice == '3':
+                purchase()
+                want_to_continue()
+            elif buyer_choice == '4':
+                continue_process = False
+            else:
+                print("\n    Invalid option, try again.")
+    elif option == '3':
+        continue_process = False
+    else:
+        print("\n    Invalid option, try again.")
+        option = input("    Enter option: ")
