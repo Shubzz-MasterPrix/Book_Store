@@ -7,7 +7,7 @@ continue_process = True
 
 
 def get_connection():
-    return mysql.connector.connect(host='localhost', user='root', password='alpinePROJ_378', database='book_store')
+    return mysql.connector.connect(host='localhost', user='root', password='', database='book_store')
 
 
 def end_connection(cur, con):
@@ -29,7 +29,7 @@ def create_table(table_name, columns):
 
 # Creating the barebone of the database if it doesn't exist.
 temporary_connector = mysql.connector.connect(
-    host='localhost', user='root', password='alpinePROJ_378')
+    host='localhost', user='root', password='')
 temp_cursor = temporary_connector.cursor()
 
 temp_cursor.execute("CREATE DATABASE IF NOT EXISTS book_store")
@@ -65,7 +65,7 @@ create_table("staff_details", {
 })
 
 temporary_connector = mysql.connector.connect(
-    host='localhost', user='root', password='alpinePROJ_378', database='book_store')
+    host='localhost', user='root', password='', database='book_store')
 temp_cursor = temporary_connector.cursor()
 
 temp_cursor.execute('SELECT * FROM login')
